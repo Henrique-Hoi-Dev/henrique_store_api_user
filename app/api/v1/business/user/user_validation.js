@@ -8,14 +8,14 @@ module.exports = {
             email: Joi.string().email().required(),
             password: Joi.string().min(6).required(),
             cpf: Joi.string()
-                .pattern(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/)
+                .pattern(/^(\d{3}\.\d{3}\.\d{3}-\d{2}|\d{11})$/)
                 .optional(),
             phone: Joi.string()
                 .pattern(/^\(\d{2}\) \d{4,5}-\d{4}$/)
                 .optional(),
             birth_date: Joi.date().max('now').optional(),
             gender: Joi.string().valid('MALE', 'FEMALE', 'OTHER').optional(),
-            role: Joi.string().valid('CUSTOMER', 'SELLER').optional(),
+            role: Joi.string().valid('CUSTOMER', 'SELLER', 'ADMIN').optional(),
             address: Joi.object({
                 street: Joi.string().optional(),
                 number: Joi.string().optional(),

@@ -8,32 +8,24 @@ const { ensureAuthorization, verifyToken } = require('../../../../main/middlewar
 const userController = new UserController();
 
 // Rotas públicas (sem autenticação)
-router.post('/register', validator(validation.register), userController.register);
-router.post('/login', validator(validation.login), userController.login);
-router.post('/forgot-password', validator(validation.forgotPassword), userController.forgotPassword);
-router.post('/reset-password', validator(validation.resetPassword), userController.resetPassword);
+router.post('/register', validator(validation.register), userController.register.bind(userController));
+router.post('/login', validator(validation.login), userController.login.bind(userController));
+router.post(
+    '/forgot-password',
+    validator(validation.forgotPassword),
+    userController.forgotPassword.bind(userController)
+);
+router.post('/reset-password', validator(validation.resetPassword), userController.resetPassword.bind(userController));
 
 // Rotas protegidas (com autenticação)
-router.get('/profile', ensureAuthorization, verifyToken, userController.getProfile);
-router.put(
-    '/profile',
-    ensureAuthorization,
-    verifyToken,
-    validator(validation.updateProfile),
-    userController.updateProfile
-);
-router.put(
-    '/change-password',
-    ensureAuthorization,
-    verifyToken,
-    validator(validation.changePassword),
-    userController.changePassword
-);
+router.get('/profile', ensureAuthorization, verifyToken, userController.getProfile.bind(userController));
+router.put('/profile', ensureAuthorization, verifyToken, userController.updateProfile.bind(userController));
+router.put('/change-password', ensureAuthorization, verifyToken, userController.changePassword.bind(userController));
 
 // Rotas administrativas (apenas admin)
-router.get('/', ensureAuthorization, verifyToken, validator(validation.list), userController.list);
-router.get('/:id', ensureAuthorization, verifyToken, validator(validation.getById), userController.getById);
-router.put('/:id', ensureAuthorization, verifyToken, validator(validation.update), userController.update);
-router.delete('/:id', ensureAuthorization, verifyToken, validator(validation.softDelete), userController.softDelete);
+router.get('/', ensureAuthorization, verifyToken, userController.list.bind(userController));
+router.get('/:id', ensureAuthorization, verifyToken, userController.getById.bind(userController));
+router.put('/:id', ensureAuthorization, verifyToken, userController.update.bind(userController));
+router.delete('/:id', ensureAuthorization, verifyToken, userController.softDelete.bind(userController));
 
 module.exports = router;

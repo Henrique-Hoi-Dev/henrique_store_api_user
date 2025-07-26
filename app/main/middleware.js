@@ -32,10 +32,19 @@ function logError(err, req, res, next) {
 
 function handleError(err, req, res, next) {
     if (err) {
-        if (err.response) res.status(err.response.status).json(err.response.data);
-        err.key = err.key ? err.key : err.message;
-        err.errorCode = keys[err.key];
-        err.message = res.__(err.message);
+        // Verificar se err tem propriedades válidas antes de acessá-las
+        if (err.response && err.response.status && err.response.data) {
+            res.status(err.response.status).json(err.response.data);
+            return;
+        }
+
+        // Definir valores padrão se não existirem
+        err.key = err.key || err.message || 'UNKNOWN_ERROR';
+        err.errorCode = keys[err.key] || 500;
+
+        // Traduzir a mensagem usando o arquivo de mensagens
+        const message = require('../../locale/error/en.json');
+        err.message = message[err.key] || err.message || 'Internal server error';
 
         if (err instanceof ev.ValidationError || err.error === 'Unprocessable Entity') {
             err = validationsErrorHandler.errorResponse(err);

@@ -19,9 +19,16 @@
         "style:fix": "prettier --write \"**/*.js\"",
         "prepare": "npx husky install",
         "migrate": "sequelize db:migrate",
+        "migrate:status": "sequelize db:migrate:status",
+        "migrate:undo": "sequelize db:migrate:undo",
+        "migrate:undo:all": "sequelize db:migrate:undo:all",
         "seed": "sequelize db:seed:all",
+        "seed:undo": "sequelize db:seed:undo:all",
         "migration:generate": "sequelize migration:generate --name",
-        "seed:generate": "sequelize seed:generate --name"
+        "seed:generate": "sequelize seed:generate --name",
+        "db:create": "sequelize db:create",
+        "db:drop": "sequelize db:drop",
+        "db:reset": "npm run db:drop && npm run db:create && npm run migrate"
     },
     "author": "Henrique Hoinacki",
     "license": "MIT",

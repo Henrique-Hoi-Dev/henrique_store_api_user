@@ -47,7 +47,7 @@ app.use(compress());
 const corsOptions = {
     origin: process.env.ALLOWED_ORIGINS
         ? process.env.ALLOWED_ORIGINS.split(',')
-        : ['http://localhost:3000', 'http://localhost:3001'],
+        : ['http://localhost:3000', 'http://localhost:3001', 'http://users-ms:3001'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
@@ -130,12 +130,13 @@ app.use(csrfProtection);
 app.use('/v1/', routers.v1);
 app.use('/', routers.v1);
 
-app.use(middle.throw404);
+// Adicionar rotas primeiro
+addRouters(routers.v1);
 
+// Depois adicionar middlewares de erro
+app.use(middle.throw404);
 app.use(middle.logError);
 app.use(middle.handleError);
 app.use(middle.errorHandler);
-
-addRouters(routers.v1);
 
 module.exports = app;

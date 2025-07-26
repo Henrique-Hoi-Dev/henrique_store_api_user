@@ -1,96 +1,145 @@
-const User = require('./user_model');
+const UserModel = require('./user_model');
 const BaseService = require('../../base/base_service');
 const bcrypt = require('bcrypt');
-const jwt = require('../../../../utils/jwt');
+const crypto = require('crypto');
+const { generateToken } = require('../../../../utils/jwt');
 const { Op } = require('sequelize');
 
 class UserService extends BaseService {
     constructor() {
         super();
-        this._userModel = User;
+        this._userModel = UserModel;
     }
 
-    // Métodos de autenticação
+    _generateToken(userProps, options = {}) {
+        const { password, hash_password, cpf, email, phone, ...userWithoutPassword } = userProps;
+
+        const token = generateToken(userWithoutPassword);
+        return token;
+    }
+
+    _generateRefreshToken(userProps) {
+        const props = {
+            userId: userProps.userId,
+            role: userProps.role,
+            name: userProps.name
+        };
+        return this._generateToken(props, { expiresIn: '7d' });
+    }
+
     async register(userData) {
-        // Verificar se email já existe
         const existingUser = await this._userModel.findOne({
-            where: { email: userData.email }
+            where: {
+                [Op.or]: [{ email: userData.email }]
+            }
         });
 
         if (existingUser) {
-            throw new Error('Email já cadastrado');
+            if (existingUser.email === userData.email) {
+                throw new Error('EMAIL_ALREADY_EXISTS');
+            }
         }
 
-        // Criptografar senha
-        const hashedPassword = await bcrypt.hash(userData.password, 10);
-
-        // Criar usuário
-        const user = await this._userModel.create({
+        const user = await this._userModel.createWithHash({
             ...userData,
-            password: hashedPassword,
             role: userData.role || 'CUSTOMER'
         });
 
-        // Remover senha do retorno
-        const { password, ...userWithoutPassword } = user.toJSON();
-        return userWithoutPassword;
+        const accessToken = this._generateToken(user);
+        const refreshToken = this._generateRefreshToken(user);
+
+        return {
+            accessToken,
+            refreshToken
+        };
     }
 
     async login(credentials) {
-        const user = await this._userModel.findOne({
-            where: { email: credentials.email }
-        });
+        const user = await this._userModel.findByEmail(credentials.email);
 
         if (!user) {
-            throw new Error('Email ou senha inválidos');
+            throw new Error('INVALID_CREDENTIALS');
         }
 
         if (!user.is_active) {
-            throw new Error('Usuário inativo');
+            throw new Error('USER_INACTIVE');
         }
 
-        const isValidPassword = await bcrypt.compare(credentials.password, user.password);
+        if (user.isAccountLocked()) {
+            throw new Error('ACCOUNT_LOCKED');
+        }
+
+        const isValidPassword = await user.validatePassword(credentials.password);
         if (!isValidPassword) {
-            throw new Error('Email ou senha inválidos');
+            await user.incrementFailedLoginAttempts();
+            throw new Error('INVALID_CREDENTIALS');
         }
 
-        // Gerar token
-        const token = jwt.generateToken({ userId: user.id, email: user.email });
+        await user.resetFailedLoginAttempts();
 
-        // Remover senha do retorno
-        const { password, ...userWithoutPassword } = user.toJSON();
-        return { user: userWithoutPassword, token };
+        user.last_login = new Date();
+        await user.save();
+
+        const accessToken = this._generateToken(user);
+        const refreshToken = this._generateRefreshToken(user);
+
+        return {
+            accessToken,
+            refreshToken
+        };
     }
 
     async forgotPassword(email) {
-        const user = await this._userModel.findOne({
-            where: { email }
-        });
+        const user = await this._userModel.findByEmail(email);
 
         if (!user) {
-            throw new Error('Email não encontrado');
+            throw new Error('EMAIL_NOT_FOUND');
         }
 
-        // Gerar token de reset (implementar lógica de email)
-        const resetToken = jwt.generateToken({ userId: user.id }, '1h');
+        // Gera token de reset usando o método do modelo
+        const { resetToken, resetTokenHash, resetTokenExpires } = user.generatePasswordResetToken();
 
-        // TODO: Enviar email com token de reset
-        // Por enquanto, apenas log
-        console.log(`Reset token for ${email}: ${resetToken}`);
+        // Salva o hash do token e a expiração
+        user.reset_token_hash = resetTokenHash;
+        user.reset_token_expires = resetTokenExpires;
+        await user.save();
 
-        return true;
+        // TODO: Enviar email com o resetToken
+        // Por enquanto, apenas retorna o token (em produção, enviar por email)
+        console.log('Reset token:', resetToken);
+
+        return { resetToken };
     }
 
     async resetPassword(token, newPassword) {
         try {
-            const decoded = jwt.verifyToken(token);
-            const hashedPassword = await bcrypt.hash(newPassword, 10);
+            // Busca usuário pelo token de reset
+            const user = await this._userModel.findOne({
+                where: {
+                    reset_token_hash: crypto.createHash('sha256').update(token).digest('hex'),
+                    reset_token_expires: { [Op.gt]: new Date() }
+                }
+            });
 
-            await this._userModel.update({ password: hashedPassword }, { where: { id: decoded.userId } });
+            if (!user) {
+                throw new Error('INVALID_OR_EXPIRED_TOKEN');
+            }
+
+            // Valida o token usando o método do modelo
+            const isValidToken = user.validatePasswordResetToken(token);
+            if (!isValidToken) {
+                throw new Error('INVALID_OR_EXPIRED_TOKEN');
+            }
+
+            // Atualiza a senha usando o método do modelo
+            await this._userModel.updatePassword(user.id, newPassword);
+
+            // Limpa o token de reset
+            await user.clearPasswordResetToken();
 
             return true;
         } catch (error) {
-            throw new Error('Token inválido ou expirado');
+            throw new Error('INVALID_TOKEN');
         }
     }
 
@@ -98,12 +147,13 @@ class UserService extends BaseService {
         const user = await this._userModel.findByPk(userId);
 
         if (!user) {
-            throw new Error('Usuário não encontrado');
+            throw new Error('USER_NOT_FOUND');
         }
 
-        const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+        // Valida a senha atual usando o método do modelo
+        const isValidPassword = await user.validatePassword(currentPassword);
         if (!isValidPassword) {
-            throw new Error('Senha atual incorreta');
+            throw new Error('INVALID_CURRENT_PASSWORD');
         }
 
         const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -141,9 +191,17 @@ class UserService extends BaseService {
         };
     }
 
-    async getById(id) {
+    async getById({ id }) {
         return this._userModel.findByPk(id, {
             attributes: { exclude: ['password'] }
+        });
+    }
+
+    async getProfile(userProps) {
+        const user = userProps.dataValues;
+
+        return this._userModel.findByPk(user.id, {
+            attributes: { exclude: ['password', 'hash_password'] }
         });
     }
 

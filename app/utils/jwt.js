@@ -1,14 +1,14 @@
 const jwt = require('jsonwebtoken');
 
-const generateToken = (payload = {}) => {
+const generateToken = (payload = {}, options = {}) => {
     if (!process.env.JWT_SECRET) {
         throw new Error('MISSING_JWT_SECRET');
     }
 
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
-        expiresIn: process.env.JWT_EXPIRES_IN || '24h',
-        issuer: process.env.JWT_ISSUER || 'henrique-store-api',
-        audience: process.env.JWT_AUDIENCE || 'henrique-store-users'
+        expiresIn: options.expiresIn || process.env.JWT_EXPIRES_IN,
+        issuer: options.issuer || process.env.JWT_ISSUER,
+        audience: options.audience || process.env.JWT_AUDIENCE
     });
     return token;
 };
@@ -24,8 +24,8 @@ const validVerifyToken = (token = '') => {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET, {
-            issuer: process.env.JWT_ISSUER || 'henrique-store-api',
-            audience: process.env.JWT_AUDIENCE || 'henrique-store-users'
+            issuer: process.env.JWT_ISSUER,
+            audience: process.env.JWT_AUDIENCE
         });
 
         return decoded;

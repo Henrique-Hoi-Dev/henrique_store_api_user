@@ -1,7 +1,6 @@
 const UserService = require('./user_service');
-const BaseController = require('../../base/base_controller');
 const HttpStatus = require('http-status');
-const jwt = require('../../../../utils/jwt');
+const BaseController = require('../../base/base_controller');
 
 class UserController extends BaseController {
     constructor() {
@@ -9,16 +8,10 @@ class UserController extends BaseController {
         this._userService = new UserService();
     }
 
-    // Métodos públicos
     async register(req, res, next) {
         try {
-            const user = await this._userService.register(req.body);
-            const token = jwt.generateToken({ userId: user.id, email: user.email });
-
-            res.status(HttpStatus.CREATED).json({
-                user: this.parseKeysToCamelcase(user),
-                token
-            });
+            const data = await this._userService.register(req.body);
+            res.status(HttpStatus.status.CREATED).json(this.parseKeysToCamelcase({ data }));
         } catch (err) {
             next(this.handleError(err));
         }
@@ -26,11 +19,8 @@ class UserController extends BaseController {
 
     async login(req, res, next) {
         try {
-            const { user, token } = await this._userService.login(req.body);
-            res.status(HttpStatus.OK).json({
-                user: this.parseKeysToCamelcase(user),
-                token
-            });
+            const data = await this._userService.login(req.body);
+            res.status(HttpStatus.status.OK).json(this.parseKeysToCamelcase({ data }));
         } catch (err) {
             next(this.handleError(err));
         }
@@ -39,9 +29,7 @@ class UserController extends BaseController {
     async forgotPassword(req, res, next) {
         try {
             await this._userService.forgotPassword(req.body.email);
-            res.status(HttpStatus.OK).json({
-                message: 'Email de recuperação enviado com sucesso'
-            });
+            res.status(HttpStatus.status.OK).json(this.parseKeysToCamelcase({ message: 'EMAIL_RECOVERY_SENT' }));
         } catch (err) {
             next(this.handleError(err));
         }
@@ -50,9 +38,7 @@ class UserController extends BaseController {
     async resetPassword(req, res, next) {
         try {
             await this._userService.resetPassword(req.body.token, req.body.newPassword);
-            res.status(HttpStatus.OK).json({
-                message: 'Senha alterada com sucesso'
-            });
+            res.status(HttpStatus.status.OK).json(this.parseKeysToCamelcase({ message: 'PASSWORD_RESET_SUCCESS' }));
         } catch (err) {
             next(this.handleError(err));
         }
@@ -61,9 +47,8 @@ class UserController extends BaseController {
     // Métodos protegidos
     async getProfile(req, res, next) {
         try {
-            const user = await this._userService.getById(req.user.userId);
-            if (!user) return next(this.notFound('USER_NOT_FOUND'));
-            res.status(HttpStatus.OK).json(this.parseKeysToCamelcase(user));
+            const data = await this._userService.getProfile(req.locals.user);
+            res.status(HttpStatus.status.OK).json(this.parseKeysToCamelcase({ data }));
         } catch (err) {
             next(this.handleError(err));
         }
@@ -71,9 +56,8 @@ class UserController extends BaseController {
 
     async updateProfile(req, res, next) {
         try {
-            const user = await this._userService.update(req.user.userId, req.body);
-            if (!user) return next(this.notFound('USER_NOT_FOUND'));
-            res.status(HttpStatus.OK).json(this.parseKeysToCamelcase(user));
+            const data = await this._userService.update(req.user.userId, req.body);
+            res.status(HttpStatus.status.OK).json(this.parseKeysToCamelcase({ data }));
         } catch (err) {
             next(this.handleError(err));
         }
@@ -82,20 +66,16 @@ class UserController extends BaseController {
     async changePassword(req, res, next) {
         try {
             await this._userService.changePassword(req.user.userId, req.body);
-            res.status(HttpStatus.OK).json({
-                message: 'Senha alterada com sucesso'
-            });
+            res.status(HttpStatus.status.OK).json(this.parseKeysToCamelcase({ message: 'PASSWORD_CHANGED_SUCCESS' }));
         } catch (err) {
             next(this.handleError(err));
         }
     }
 
-    // Métodos administrativos
     async list(req, res, next) {
         try {
-            const { page, limit, is_active, role, search } = req.query;
-            const result = await this._userService.list({ page, limit, is_active, role, search });
-            res.status(HttpStatus.OK).json(this.parseKeysToCamelcase(result));
+            const data = await this._userService.list(req.query);
+            res.status(HttpStatus.status.OK).json(this.parseKeysToCamelcase({ data }));
         } catch (err) {
             next(this.handleError(err));
         }
@@ -103,9 +83,8 @@ class UserController extends BaseController {
 
     async getById(req, res, next) {
         try {
-            const user = await this._userService.getById(req.params.id);
-            if (!user) return next(this.notFound('USER_NOT_FOUND'));
-            res.status(HttpStatus.OK).json(this.parseKeysToCamelcase(user));
+            const data = await this._userService.getById(req.params.id);
+            res.status(HttpStatus.status.OK).json(this.parseKeysToCamelcase({ data }));
         } catch (err) {
             next(this.handleError(err));
         }
@@ -113,9 +92,8 @@ class UserController extends BaseController {
 
     async update(req, res, next) {
         try {
-            const user = await this._userService.update(req.params.id, req.body);
-            if (!user) return next(this.notFound('USER_NOT_FOUND'));
-            res.status(HttpStatus.OK).json(this.parseKeysToCamelcase(user));
+            const data = await this._userService.update(req.params.id, req.body);
+            res.status(HttpStatus.status.OK).json(this.parseKeysToCamelcase({ data }));
         } catch (err) {
             next(this.handleError(err));
         }
@@ -123,9 +101,8 @@ class UserController extends BaseController {
 
     async softDelete(req, res, next) {
         try {
-            const user = await this._userService.softDelete(req.params.id);
-            if (!user) return next(this.notFound('USER_NOT_FOUND'));
-            res.status(HttpStatus.OK).json(this.parseKeysToCamelcase(user));
+            const data = await this._userService.softDelete(req.params.id);
+            res.status(HttpStatus.status.OK).json(this.parseKeysToCamelcase({ data }));
         } catch (err) {
             next(this.handleError(err));
         }

@@ -59,7 +59,7 @@ class BaseController {
         }
         let message = error.message || error.errorMessage;
         if (!message && typeof error.error === 'string') message = error.error;
-        const status = error.status;
+        const status = error.status || this.httpStatus.UNPROCESSABLE_ENTITY;
         return this.errorResponse(status, message, { field: error.field, reasons: error.reasons });
     }
 
