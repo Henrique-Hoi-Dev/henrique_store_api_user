@@ -4,7 +4,6 @@ const HttpStatus = require('http-status');
 
 // Mock do UserService
 jest.mock('../../app/api/v1/business/user/user_service');
-jest.mock('../../app/utils/jwt');
 
 describe('UserController', () => {
     let userController;
@@ -61,7 +60,8 @@ describe('UserController', () => {
                         name: 'João Silva',
                         email: 'joao@example.com'
                     }),
-                    token: expect.any(String)
+                    accessToken: expect.any(String),
+                    refreshToken: expect.any(String)
                 })
             );
         });
@@ -93,7 +93,8 @@ describe('UserController', () => {
                     name: 'João Silva',
                     email: 'joao@example.com'
                 },
-                token: 'jwt-token'
+                accessToken: 'access-token',
+                refreshToken: 'refresh-token'
             };
 
             mockReq.body = loginData;
@@ -110,7 +111,8 @@ describe('UserController', () => {
                         name: 'João Silva',
                         email: 'joao@example.com'
                     }),
-                    token: 'jwt-token'
+                    accessToken: 'access-token',
+                    refreshToken: 'refresh-token'
                 })
             );
         });

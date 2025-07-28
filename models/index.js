@@ -1,5 +1,5 @@
 const { sequelize } = require('../config/database');
-const User = require('../app/api/v1/business/user/user_model');
+const UserModel = require('../app/api/v1/business/user/user_model');
 
 // Sync models with database
 const syncModels = async () => {
@@ -13,6 +13,6 @@ const syncModels = async () => {
 
 module.exports = {
     sequelize,
-    User,
+    UserModel,
     syncModels
 };

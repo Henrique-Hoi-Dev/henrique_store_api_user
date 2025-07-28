@@ -8,7 +8,7 @@ Microserviço de usuários para o e-commerce Henrique Store, responsável por au
 - ✅ Gestão de perfis e endereços
 - ✅ Recuperação de senha
 - ✅ Administração de usuários
-- ✅ Autenticação JWT
+- ✅ Autenticação delegada ao ms_auth
 - ✅ Validação de dados
 - ✅ Testes unitários e de integração
 
