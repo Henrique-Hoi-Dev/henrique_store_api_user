@@ -3,8 +3,7 @@ const _ = require('lodash');
 const ValidationsErrorHandler = require('./validations_error_handler');
 const validationsErrorHandler = new ValidationsErrorHandler();
 const keys = require('../../app/utils/error_mapping');
-const { validVerifyToken } = require('../../app/utils/jwt');
-const jwt = require('jsonwebtoken');
+const AuthProvider = require('../../app/providers/auth_provider');
 
 const logger = require('../utils/logger');
 
@@ -32,17 +31,14 @@ function logError(err, req, res, next) {
 
 function handleError(err, req, res, next) {
     if (err) {
-        // Verificar se err tem propriedades válidas antes de acessá-las
         if (err.response && err.response.status && err.response.data) {
             res.status(err.response.status).json(err.response.data);
             return;
         }
 
-        // Definir valores padrão se não existirem
         err.key = err.key || err.message || 'UNKNOWN_ERROR';
         err.errorCode = keys[err.key] || 500;
 
-        // Traduzir a mensagem usando o arquivo de mensagens
         const message = require('../../locale/error/en.json');
         err.message = message[err.key] || err.message || 'Internal server error';
 
@@ -98,30 +94,28 @@ async function verifyToken(req, res, next) {
         }
 
         try {
-            const decodedToken = validVerifyToken(token);
-            req.locals = { ...req.locals, user: decodedToken };
+            const authProvider = new AuthProvider();
+            const userData = await authProvider.verifyToken(token);
+            req.locals = { ...req.locals, user: userData };
             next();
-        } catch (jwtError) {
-            logger.error('JWT Verification Error:', jwtError);
+        } catch (error) {
+            logger.error('Token verification error:', error.message);
 
             let errorMessage = 'INVALID_TOKEN';
             let errorKey = 'INVALID_TOKEN';
 
-            if (jwtError instanceof jwt.TokenExpiredError) {
+            if (error.status === 401) {
                 errorMessage = 'TOKEN_EXPIRED';
                 errorKey = 'TOKEN_EXPIRED';
-            } else if (jwtError instanceof jwt.JsonWebTokenError) {
-                errorMessage = 'INVALID_TOKEN_SIGNATURE';
-                errorKey = 'INVALID_TOKEN_SIGNATURE';
-            } else if (jwtError instanceof jwt.NotBeforeError) {
-                errorMessage = 'TOKEN_NOT_ACTIVE';
-                errorKey = 'TOKEN_NOT_ACTIVE';
+            } else if (error.status === 403) {
+                errorMessage = 'TOKEN_BLACKLISTED';
+                errorKey = 'TOKEN_BLACKLISTED';
             }
 
-            const error = new Error(errorMessage);
-            error.status = 401;
-            error.key = errorKey;
-            next(error);
+            const err = new Error(errorMessage);
+            err.status = 401;
+            err.key = errorKey;
+            next(err);
         }
     } catch (err) {
         logger.error('Token verification error:', err);
@@ -155,7 +149,6 @@ async function ensureAuthorization(req, res, next) {
 function errorHandler(err, req, res, next) {
     console.error(err);
 
-    // Handle specific JWT errors
     if (err.key === 'TOKEN_EXPIRED') {
         return res.status(401).json({
             error: {
@@ -207,6 +200,39 @@ function errorHandler(err, req, res, next) {
                 status: 401,
                 key: 'TOKEN_NOT_ACTIVE',
                 errorCode: keys['TOKEN_NOT_ACTIVE'] || 401
+            }
+        });
+    }
+
+    if (err.key === 'TOKEN_BLACKLISTED') {
+        return res.status(401).json({
+            error: {
+                message: 'Token foi invalidado. Faça login novamente.',
+                status: 401,
+                key: 'TOKEN_BLACKLISTED',
+                errorCode: keys['TOKEN_BLACKLISTED'] || 401
+            }
+        });
+    }
+
+    if (err.key === 'SESSION_INVALIDATED') {
+        return res.status(401).json({
+            error: {
+                message: 'Sessão foi invalidada. Faça login novamente.',
+                status: 401,
+                key: 'SESSION_INVALIDATED',
+                errorCode: keys['SESSION_INVALIDATED'] || 401
+            }
+        });
+    }
+
+    if (err.key === 'SESSION_VALIDATION_ERROR') {
+        return res.status(401).json({
+            error: {
+                message: 'Erro na validação da sessão. Faça login novamente.',
+                status: 401,
+                key: 'SESSION_VALIDATION_ERROR',
+                errorCode: keys['SESSION_VALIDATION_ERROR'] || 401
             }
         });
     }

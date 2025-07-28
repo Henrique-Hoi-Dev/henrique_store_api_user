@@ -32,7 +32,8 @@ describe('User API Integration Tests', () => {
             const response = await request(app).post('/v1/user/register').send(userData).expect(201);
 
             expect(response.body).toHaveProperty('user');
-            expect(response.body).toHaveProperty('token');
+            expect(response.body).toHaveProperty('accessToken');
+            expect(response.body).toHaveProperty('refreshToken');
             expect(response.body.user.name).toBe('João Silva');
             expect(response.body.user.email).toBe('joao@example.com');
             expect(response.body.user).not.toHaveProperty('password');
@@ -85,7 +86,8 @@ describe('User API Integration Tests', () => {
             const response = await request(app).post('/v1/user/login').send(loginData).expect(200);
 
             expect(response.body).toHaveProperty('user');
-            expect(response.body).toHaveProperty('token');
+            expect(response.body).toHaveProperty('accessToken');
+            expect(response.body).toHaveProperty('refreshToken');
             expect(response.body.user.email).toBe('joao@example.com');
         });
 
@@ -113,7 +115,7 @@ describe('User API Integration Tests', () => {
                 password: '123456'
             });
 
-            authToken = registerResponse.body.token;
+            authToken = registerResponse.body.accessToken;
             userId = registerResponse.body.user.id;
         });
 
@@ -149,7 +151,7 @@ describe('User API Integration Tests', () => {
                 password: '123456'
             });
 
-            authToken = registerResponse.body.token;
+            authToken = registerResponse.body.accessToken;
         });
 
         it('should update user profile successfully', async () => {
@@ -181,7 +183,7 @@ describe('User API Integration Tests', () => {
                 role: 'ADMIN'
             });
 
-            adminToken = registerResponse.body.token;
+            adminToken = registerResponse.body.accessToken;
 
             // Criar alguns usuários para teste
             await request(app).post('/v1/user/register').send({

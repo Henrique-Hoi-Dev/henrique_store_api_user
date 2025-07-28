@@ -2,6 +2,7 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('../../../../../config/database');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
+const { cleanUserData } = require('../../../../utils/data-cleaner');
 
 const User = sequelize.define(
     'User',
@@ -13,7 +14,10 @@ const User = sequelize.define(
         },
         name: {
             type: DataTypes.STRING,
-            allowNull: false
+            allowNull: false,
+            validate: {
+                len: [2, 100]
+            }
         },
         email: {
             type: DataTypes.STRING,
@@ -23,10 +27,6 @@ const User = sequelize.define(
                 isEmail: true
             }
         },
-        password: {
-            type: DataTypes.STRING,
-            allowNull: true
-        },
         hash_password: {
             type: DataTypes.STRING,
             allowNull: false
@@ -34,24 +34,41 @@ const User = sequelize.define(
         cpf: {
             type: DataTypes.STRING,
             allowNull: true,
-            unique: true
+            unique: true,
+            validate: {
+                len: [11, 11] // CPF deve ter exatamente 11 dígitos (sem máscara)
+            }
         },
         phone: {
             type: DataTypes.STRING,
-            allowNull: true
+            allowNull: true,
+            validate: {
+                len: [10, 11] // Telefone deve ter 10 ou 11 dígitos (sem máscara)
+            }
         },
         birth_date: {
             type: DataTypes.DATEONLY,
-            allowNull: true
+            allowNull: true,
+            validate: {
+                isDate: true,
+                isPast(value) {
+                    if (value && new Date(value) >= new Date()) {
+                        throw new Error('Birth date must be in the past');
+                    }
+                }
+            }
         },
         gender: {
-            type: DataTypes.ENUM('MALE', 'FEMALE', 'OTHER'),
+            type: DataTypes.ENUM('MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY'),
             allowNull: true
         },
         role: {
-            type: DataTypes.ENUM('ADMIN', 'CUSTOMER', 'SELLER'),
-            defaultValue: 'CUSTOMER',
-            allowNull: false
+            type: DataTypes.ENUM('ADMIN', 'BUYER', 'SELLER'),
+            defaultValue: 'BUYER',
+            allowNull: false,
+            validate: {
+                isIn: [['ADMIN', 'BUYER', 'SELLER']]
+            }
         },
         is_active: {
             type: DataTypes.BOOLEAN,
@@ -69,17 +86,42 @@ const User = sequelize.define(
             type: DataTypes.DATE,
             allowNull: true
         },
+        last_logout: {
+            type: DataTypes.DATE,
+            allowNull: true,
+            comment: 'Last logout timestamp'
+        },
         // Address
         address: {
             type: DataTypes.JSONB,
             allowNull: true,
-            comment: 'Complete user address'
+            comment: 'Complete user address',
+            validate: {
+                isValidAddress(value) {
+                    if (value && typeof value === 'object') {
+                        const requiredFields = ['street', 'city', 'state', 'zip_code'];
+                        const missingFields = requiredFields.filter((field) => !value[field]);
+                        if (missingFields.length > 0) {
+                            throw new Error(`Missing required address fields: ${missingFields.join(', ')}`);
+                        }
+                    }
+                }
+            }
         },
         // User preferences
         preferences: {
             type: DataTypes.JSONB,
             allowNull: true,
-            comment: 'User preferences (notifications, language, etc.)'
+            comment: 'User preferences (notifications, language, etc.)',
+            defaultValue: {
+                language: 'pt-BR',
+                notifications: {
+                    email: true,
+                    push: true,
+                    sms: false
+                },
+                theme: 'light'
+            }
         },
         // Marketing data
         marketing_consent: {
@@ -89,6 +131,24 @@ const User = sequelize.define(
         newsletter_subscription: {
             type: DataTypes.BOOLEAN,
             defaultValue: false
+        },
+        // OAuth2 Provider fields
+        provider: {
+            type: DataTypes.ENUM('local', 'google'),
+            defaultValue: 'local',
+            allowNull: false,
+            comment: 'Authentication provider (local or google)'
+        },
+        google_id: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            unique: true,
+            comment: 'Google OAuth2 user ID (from id_token.sub)'
+        },
+        google_picture: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            comment: 'Google profile picture URL'
         },
         // Integration data
         external_id: {
@@ -111,17 +171,6 @@ const User = sequelize.define(
             type: DataTypes.UUID,
             allowNull: true,
             comment: 'ID of user who updated this record'
-        },
-        // Password reset fields
-        reset_token_hash: {
-            type: DataTypes.STRING,
-            allowNull: true,
-            comment: 'Hash of password reset token'
-        },
-        reset_token_expires: {
-            type: DataTypes.DATE,
-            allowNull: true,
-            comment: 'Token expiration date'
         },
         password_changed_at: {
             type: DataTypes.DATE,
@@ -160,6 +209,11 @@ const User = sequelize.define(
             allowNull: true,
             comment: 'Secret for 2FA (TOTP)'
         },
+        temp_2fa_secret: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            comment: 'Temporary secret for 2FA setup'
+        },
         backup_codes: {
             type: DataTypes.JSONB,
             allowNull: true,
@@ -185,12 +239,19 @@ const User = sequelize.define(
             type: DataTypes.DATE,
             allowNull: true,
             comment: 'Scheduled data deletion date'
+        },
+        // Soft delete
+        deleted_at: {
+            type: DataTypes.DATE,
+            allowNull: true,
+            comment: 'Soft delete timestamp'
         }
     },
     {
         tableName: 'Users',
         underscored: true,
         timestamps: true,
+        paranoid: true, // Enable soft deletes
         indexes: [
             {
                 fields: ['email']
@@ -206,17 +267,42 @@ const User = sequelize.define(
             },
             {
                 fields: ['external_id']
+            },
+            {
+                fields: ['deleted_at']
+            },
+            {
+                fields: ['provider']
+            },
+            {
+                fields: ['google_id']
             }
         ],
         hooks: {
             beforeCreate: async (user) => {
-                if (!user.password) {
-                    throw new Error('Password is required for user creation');
+                // Clean CPF and phone data before saving
+                const cleanedData = cleanUserData(user);
+                Object.assign(user, cleanedData);
+
+                // Password is only required for local authentication
+                if (user.provider === 'local' && !user.hash_password) {
+                    throw new Error('Password is required for local user creation');
                 }
 
-                // Hash the password
-                user.hash_password = await user.hashPassword(user.password);
-                user.last_password_change = new Date();
+                // Set consent date if consent is given
+                if (user.data_processing_consent) {
+                    user.consent_date = new Date();
+                }
+            },
+            beforeUpdate: async (user) => {
+                // Clean CPF and phone data before saving
+                const cleanedData = cleanUserData(user);
+                Object.assign(user, cleanedData);
+
+                // Update consent date if consent is given for the first time
+                if (user.changed('data_processing_consent') && user.data_processing_consent && !user.consent_date) {
+                    user.consent_date = new Date();
+                }
             }
         }
     }
@@ -265,35 +351,6 @@ User.prototype.generatePasswordResetToken = function () {
     } catch (error) {
         throw new Error(`Error generating reset token: ${error.message}`);
     }
-};
-
-// Método para validar token de reset
-User.prototype.validatePasswordResetToken = function (token) {
-    try {
-        if (!this.reset_token_hash || !this.reset_token_expires) {
-            return false;
-        }
-
-        // Check if token expired
-        if (new Date() > this.reset_token_expires) {
-            return false;
-        }
-
-        // Generate hash of provided token
-        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-
-        // Compare with stored hash
-        return tokenHash === this.reset_token_hash;
-    } catch (error) {
-        throw new Error(`Error validating reset token: ${error.message}`);
-    }
-};
-
-// Método para limpar token de reset
-User.prototype.clearPasswordResetToken = function () {
-    this.reset_token_hash = null;
-    this.reset_token_expires = null;
-    return this.save();
 };
 
 // Security methods for e-commerce
@@ -372,33 +429,6 @@ User.prototype.validatePasswordStrength = function (password) {
     };
 };
 
-// Hook for automatic password hashing before updating
-User.beforeUpdate(async (user) => {
-    if (user.changed('password') && user.password) {
-        // Validate password strength
-        const strengthCheck = user.validatePasswordStrength(user.password);
-        if (!strengthCheck.isValid) {
-            throw new Error(`Password does not meet security requirements: ${strengthCheck.errors.join(', ')}`);
-        }
-
-        // Check if password is not in history
-        const isInHistory = await user.isPasswordInHistory(user.password);
-        if (isInHistory) {
-            throw new Error('New password cannot be the same as the last 5 passwords used');
-        }
-
-        // Add current password to history before updating
-        if (user.hash_password) {
-            await user.addPasswordToHistory(user.password);
-        }
-
-        user.hash_password = await user.hashPassword(user.password);
-        user.last_password_change = new Date();
-        // Remove plain text password
-        user.password = undefined;
-    }
-});
-
 // Static methods for common operations
 User.findByEmail = async function (email) {
     return await this.findOne({ where: { email: email.toLowerCase() } });
@@ -423,13 +453,23 @@ User.createWithHash = async function (userData) {
             throw new Error('Password is required for user creation');
         }
 
+        // Validate password strength
+        const tempUser = new User();
+        const strengthCheck = tempUser.validatePasswordStrength(userData.password);
+        if (!strengthCheck.isValid) {
+            throw new Error(`Password does not meet security requirements: ${strengthCheck.errors.join(', ')}`);
+        }
+
         // Hash the password before creating
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(userData.password, saltRounds);
 
+        // Remove plain text password from userData
+        const { password, ...userDataWithoutPassword } = userData;
+
         // Create user with hashed password
         const user = await this.create({
-            ...userData,
+            ...userDataWithoutPassword,
             hash_password: hashedPassword,
             last_password_change: new Date()
         });
@@ -448,7 +488,26 @@ User.updatePassword = async function (userId, newPassword) {
             throw new Error('User not found');
         }
 
-        user.password = newPassword;
+        // Validate password strength
+        const strengthCheck = user.validatePasswordStrength(newPassword);
+        if (!strengthCheck.isValid) {
+            throw new Error(`Password does not meet security requirements: ${strengthCheck.errors.join(', ')}`);
+        }
+
+        // Check if password is not in history
+        const isInHistory = await user.isPasswordInHistory(newPassword);
+        if (isInHistory) {
+            throw new Error('New password cannot be the same as the last 5 passwords used');
+        }
+
+        // Add current password to history before updating
+        if (user.hash_password) {
+            await user.addPasswordToHistory(newPassword);
+        }
+
+        // Hash the new password
+        user.hash_password = await user.hashPassword(newPassword);
+        user.last_password_change = new Date();
         await user.save();
 
         return user;
