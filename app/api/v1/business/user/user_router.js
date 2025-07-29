@@ -52,18 +52,18 @@ router.post('/generate-password', userController.generatePassword.bind(userContr
 
 // User profile management
 router.get(
-    '/me',
+    '/profile',
     ensureAuthorization,
     verifyToken,
-    RBAC.requireActiveUser,
+    RBAC.requireAdminOrBuyer,
     userController.getProfile.bind(userController)
 );
 
 router.put(
-    '/me',
+    '/profile',
     ensureAuthorization,
     verifyToken,
-    RBAC.requireActiveUser,
+    RBAC.requireBuyer,
     validator(validation.updateProfile),
     userController.updateProfile.bind(userController)
 );
@@ -72,7 +72,7 @@ router.put(
     '/change-password',
     ensureAuthorization,
     verifyToken,
-    RBAC.requireActiveUser,
+    RBAC.requireAdminOrBuyer,
     validator(validation.changePassword),
     userController.changePassword.bind(userController)
 );
@@ -82,7 +82,7 @@ router.post(
     '/deactivate-account',
     ensureAuthorization,
     verifyToken,
-    RBAC.requireActiveUser,
+    RBAC.requireAdminOrBuyer,
     userController.deactivateAccount.bind(userController)
 );
 
@@ -98,7 +98,7 @@ router.post(
     '/2fa/init',
     ensureAuthorization,
     verifyToken,
-    RBAC.requireActiveUser,
+    RBAC.requireAdminOrBuyer,
     userController.init2FA.bind(userController)
 );
 
@@ -106,7 +106,7 @@ router.post(
     '/2fa/verify-setup',
     ensureAuthorization,
     verifyToken,
-    RBAC.requireActiveUser,
+    RBAC.requireAdminOrBuyer,
     validator(validation.verify2FASetup),
     userController.verify2FASetup.bind(userController)
 );
@@ -115,7 +115,7 @@ router.post(
     '/2fa/disable',
     ensureAuthorization,
     verifyToken,
-    RBAC.requireActiveUser,
+    RBAC.requireAdminOrBuyer,
     validator(validation.disable2FA),
     userController.disable2FA.bind(userController)
 );
@@ -124,7 +124,7 @@ router.post(
     '/2fa/verify',
     ensureAuthorization,
     verifyToken,
-    RBAC.requireActiveUser,
+    RBAC.requireAdminOrBuyer,
     validator(validation.verify2FA),
     userController.verify2FA.bind(userController)
 );
@@ -133,7 +133,7 @@ router.post(
     '/2fa/backup-codes',
     ensureAuthorization,
     verifyToken,
-    RBAC.requireActiveUser,
+    RBAC.requireAdminOrBuyer,
     validator(validation.generateNewBackupCodes),
     userController.generateNewBackupCodes.bind(userController)
 );
@@ -142,7 +142,7 @@ router.post(
     '/2fa/enable',
     ensureAuthorization,
     verifyToken,
-    RBAC.requireActiveUser,
+    RBAC.requireAdminOrBuyer,
     userController.enable2FA.bind(userController)
 );
 
@@ -151,7 +151,7 @@ router.post(
     '/consent',
     ensureAuthorization,
     verifyToken,
-    RBAC.requireActiveUser,
+    RBAC.requireAdminOrBuyer,
     validator(validation.updateConsent),
     userController.updateConsent.bind(userController)
 );
@@ -160,7 +160,7 @@ router.post(
     '/request-data-deletion',
     ensureAuthorization,
     verifyToken,
-    RBAC.requireActiveUser,
+    RBAC.requireAdminOrBuyer,
     userController.requestDataDeletion.bind(userController)
 );
 

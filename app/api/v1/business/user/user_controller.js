@@ -50,7 +50,7 @@ class UserController extends BaseController {
 
     async logout(req, res, next) {
         try {
-            await this._userService.logout(req.body.token || req.headers.authorization?.replace('Bearer ', ''));
+            await this._userService.logout(req.headers.authorization);
 
             AuditLogger.logUserLogout(
                 req.locals.user || { email: 'unknown' },
@@ -221,7 +221,7 @@ class UserController extends BaseController {
 
     async init2FA(req, res, next) {
         try {
-            const data = await this._userService.init2FA(req.locals.user.id);
+            const data = await this._userService.init2FA(req.locals.user);
 
             AuditLogger.log2FAInitiated(req.locals.user, AuditLogger.getClientIP(req), AuditLogger.getUserAgent(req));
 
@@ -286,7 +286,7 @@ class UserController extends BaseController {
 
     async updateConsent(req, res, next) {
         try {
-            const data = await this._userService.updateConsent(req.locals.user.id, req.body);
+            const data = await this._userService.updateConsent(req.locals.user, req.body);
 
             AuditLogger.logConsentGiven(
                 req.locals.user,

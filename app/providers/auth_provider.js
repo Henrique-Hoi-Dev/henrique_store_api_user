@@ -3,7 +3,6 @@ const BaseIntegration = require('../api/v1/base/base_integration');
 class AuthProvider extends BaseIntegration {
     constructor() {
         super('auth');
-        this.client = this.httpClient;
     }
 
     async generateTokens(userData) {
@@ -39,6 +38,7 @@ class AuthProvider extends BaseIntegration {
 
     async logout(token) {
         try {
+            token = token.replace('Bearer ', '');
             const response = await this.httpClient.post('/auth/logout', {
                 token
             });

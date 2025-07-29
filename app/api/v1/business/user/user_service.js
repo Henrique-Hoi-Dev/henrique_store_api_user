@@ -71,9 +71,9 @@ class UserService extends BaseService {
         const tokens = await this._authProvider.generateTokens(user);
 
         return {
-            userId: user.id,
             accessToken: tokens.accessToken,
-            refreshToken: tokens.refreshToken
+            refreshToken: tokens.refreshToken,
+            expiresIn: tokens.expiresIn
         };
     }
 
@@ -114,9 +114,9 @@ class UserService extends BaseService {
         const tokens = await this._authProvider.generateTokens(user);
 
         return {
-            userId: user.id,
             accessToken: tokens.accessToken,
-            refreshToken: tokens.refreshToken
+            refreshToken: tokens.refreshToken,
+            expiresIn: tokens.expiresIn
         };
     }
 
@@ -365,7 +365,7 @@ class UserService extends BaseService {
     }
 
     async getProfile(user) {
-        const userId = user.id || user.dataValues?.id;
+        const userId = user.userId || user.decoded?.userId;
 
         if (!userId) {
             throw new Error('USER_ID_REQUIRED');
@@ -454,27 +454,29 @@ class UserService extends BaseService {
         return user;
     }
 
-    async init2FA(userId) {
-        const user = await this._userModel.findByPk(userId);
-        if (!user) {
+    async init2FA(user) {
+        const userId = user.userId || user.decoded?.userId;
+
+        const userQuery = await this._userModel.findByPk(userId);
+        if (!userQuery) {
             throw new Error('USER_NOT_FOUND');
         }
 
-        if (user.two_factor_enabled) {
+        if (userQuery.two_factor_enabled) {
             throw new Error('2FA_ALREADY_ENABLED');
         }
 
         const { secret, otpauthUrl } = generateSecret({
             name: 'Henrique Store',
             issuer: 'Henrique Store',
-            account: user.email
+            account: userQuery.email
         });
 
         const qrCode = await generateQRCode(otpauthUrl);
 
         const backupCodes = generateBackupCodes(8, 8);
 
-        await user.update({
+        await userQuery.update({
             temp_2fa_secret: secret,
             backup_codes: backupCodes
         });
@@ -624,9 +626,12 @@ class UserService extends BaseService {
         return this.init2FA(userId);
     }
 
-    async updateConsent(userId, consentData) {
-        const user = await this._userModel.findByPk(userId);
-        if (!user) {
+    async updateConsent(user, consentData) {
+        console.log('user:::::::', user);
+        const userId = user.userId || user.decoded?.userId;
+
+        const userQuery = await this._userModel.findByPk(userId);
+        if (!userQuery) {
             throw new Error('USER_NOT_FOUND');
         }
 
@@ -647,8 +652,8 @@ class UserService extends BaseService {
             updateData.newsletter_subscription = consentData.newsletterSubscription;
         }
 
-        await user.update(updateData);
-        return user;
+        await userQuery.update(updateData);
+        return userQuery;
     }
 
     async requestDataDeletion(userId) {

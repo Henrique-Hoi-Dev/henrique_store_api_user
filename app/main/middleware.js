@@ -1,9 +1,11 @@
 const ev = require('express-validation');
 const _ = require('lodash');
-const ValidationsErrorHandler = require('./validations_error_handler');
-const validationsErrorHandler = new ValidationsErrorHandler();
 const keys = require('../../app/utils/error_mapping');
+const ValidationsErrorHandler = require('./validations_error_handler');
 const AuthProvider = require('../../app/providers/auth_provider');
+
+const validationsErrorHandler = new ValidationsErrorHandler();
+const authProvider = new AuthProvider();
 
 const logger = require('../utils/logger');
 
@@ -75,16 +77,7 @@ function throw404(req, res, next) {
 
 async function verifyToken(req, res, next) {
     try {
-        const authHeader = req.header('Authorization');
-
-        if (!authHeader) {
-            const error = new Error('TOKEN_REQUIRED');
-            error.status = 401;
-            error.key = 'TOKEN_REQUIRED';
-            return next(error);
-        }
-
-        const token = authHeader.replace('Bearer ', '');
+        const token = req.header('Authorization').replace('Bearer ', '');
 
         if (!token) {
             const error = new Error('INVALID_TOKEN_FORMAT');
@@ -94,7 +87,6 @@ async function verifyToken(req, res, next) {
         }
 
         try {
-            const authProvider = new AuthProvider();
             const userData = await authProvider.verifyToken(token);
             req.locals = { ...req.locals, user: userData };
             next();

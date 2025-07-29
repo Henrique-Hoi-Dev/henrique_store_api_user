@@ -30,5 +30,7 @@
     "PASSWORD_RESET_EMAIL_ALREADY_SENT": "Password reset email already sent",
     "PASSWORD_RESET_EMAIL_NOT_FOUND": "Password reset email not found",
     "PASSWORD_RESET_EMAIL_INVALID": "Password reset email invalid",
-    "PASSWORD_RESET_EMAIL_USED": "Password reset email used"
+    "PASSWORD_RESET_EMAIL_USED": "Password reset email used",
+    "USER_ID_REQUIRED": "User ID required",
+    "USER_NOT_ACTIVE": "User not active"
 }
